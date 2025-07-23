@@ -1,21 +1,15 @@
-name: AWM Website Scraper
+name: AWM Complete Website Scraper
 
 on:
   workflow_dispatch:
-    inputs:
-      max_pages:
-        description: 'Maximum number of pages to scrape'
-        required: false
-        default: '50'
-        type: string
   schedule:
-    # Run weekly on Sundays at 2 AM UTC
-    - cron: '0 2 * * 0'
+    # Run monthly on the 1st at 2 AM UTC
+    - cron: '0 2 1 * *'
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 360  # 6 hours max
     
     steps:
     - name: Checkout repository
@@ -34,30 +28,36 @@ jobs:
     - name: Create output directory
       run: mkdir -p output
     
-    - name: Run scraper
-      env:
-        MAX_PAGES: ${{ github.event.inputs.max_pages || '50' }}
+    - name: Run comprehensive scraper
       run: python awm_scraper.py
     
-    - name: Upload Excel artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: awm-scraped-data-${{ github.run_number }}
-        path: output/awm_scraped_data.xlsx
-        retention-days: 30
-    
-    - name: Upload all output files
-      uses: actions/upload-artifact@v4
-      with:
-        name: awm-complete-output-${{ github.run_number }}
-        path: output/
-        retention-days: 30
-    
-    - name: Display summary
+    - name: Compress large output
       run: |
-        echo "Scraping completed successfully!"
+        cd output
+        tar -czf ../awm_complete_data.tar.gz *
+        cd ..
+    
+    - name: Upload Excel file
+      uses: actions/upload-artifact@v4
+      with:
+        name: awm-excel-data-${{ github.run_number }}
+        path: output/awm_scraped_data.xlsx
+        retention-days: 90
+    
+    - name: Upload compressed complete data
+      uses: actions/upload-artifact@v4
+      with:
+        name: awm-complete-data-${{ github.run_number }}
+        path: awm_complete_data.tar.gz
+        retention-days: 90
+    
+    - name: Display final summary
+      run: |
+        echo "Comprehensive scraping completed!"
         echo "Files in output directory:"
         ls -la output/
         if [ -f output/awm_scraped_data.xlsx ]; then
           echo "Excel file size: $(du -h output/awm_scraped_data.xlsx | cut -f1)"
         fi
+        echo "Total output directory size: $(du -sh output/ | cut -f1)"
+        echo "Compressed archive size: $(du -h awm_complete_data.tar.gz | cut -f1)"
