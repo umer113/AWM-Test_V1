@@ -138,17 +138,15 @@ class AWMScraper:
             flattened.append(flat_item)
         return flattened
     
-    def scrape_website(self, max_pages=100):
-        """Main scraping function with page limit for GitHub Actions"""
+    def scrape_website(self):
+        """Main scraping function to scrape entire website"""
         self.to_visit.append(self.base_url)
-        pages_scraped = 0
         
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            while self.to_visit and pages_scraped < max_pages:
+            while self.to_visit:
                 # Get batch of URLs to process
                 batch = []
-                remaining_pages = max_pages - pages_scraped
-                batch_size = min(self.max_workers, len(self.to_visit), remaining_pages)
+                batch_size = min(self.max_workers, len(self.to_visit))
                 
                 for _ in range(batch_size):
                     if self.to_visit:
@@ -165,17 +163,13 @@ class AWMScraper:
                     result = future.result()
                     if result:
                         self.scraped_data.append(result)
-                        pages_scraped += 1
                         
-                        # Save incrementally
-                        if len(self.scraped_data) % 25 == 0:
+                        # Save incrementally every 50 pages
+                        if len(self.scraped_data) % 50 == 0:
                             self.save_data(self.scraped_data, f'awm_data_batch_{len(self.scraped_data)}.json')
-                            print(f"Saved batch of {len(self.scraped_data)} pages")
+                            print(f"Progress: {len(self.scraped_data)} pages scraped, {len(self.to_visit)} URLs remaining")
                 
                 time.sleep(self.delay)
-                
-                if pages_scraped >= max_pages:
-                    break
         
         # Final saves
         self.save_data(self.scraped_data, 'awm_complete_data.json')
@@ -192,12 +186,10 @@ class AWMScraper:
 
 # Main execution
 if __name__ == "__main__":
-    print("Starting AWM website scraping...")
+    print("Starting comprehensive AWM website scraping...")
     scraper = AWMScraper(max_workers=3, delay=2)
     
-    # Limit pages for GitHub Actions (adjust as needed)
-    max_pages = int(os.environ.get('MAX_PAGES', 50))
-    data = scraper.scrape_website(max_pages=max_pages)
+    data = scraper.scrape_website()
     
     print(f"Scraping completed. {len(data)} pages scraped.")
     print("Files saved in 'output' directory:")
